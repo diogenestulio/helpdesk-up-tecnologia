@@ -170,5 +170,10 @@ elif menu == "Dashboard":
                       color="Status", color_discrete_sequence=[PRIMARY, ACCENT])
         st.plotly_chart(fig1, use_container_width=True)
 
-        fig2 = px.pie(df_ch, names="Etapa", title="Distribuição por Etapa",
-                      color_discrete_sequence
+        fig2 = px.pie(
+    df_ch,
+    names="Etapa",
+    title="Distribuição por Etapa",
+    color_discrete_sequence=px.colors.sequential.Blues
+)
+st.plotly_chart(fig2, use_container_width=True)
