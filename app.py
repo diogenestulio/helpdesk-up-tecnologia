@@ -192,3 +192,4 @@ elif menu == "Kanban de Chamados":
                     </div>
                     """,
                     unsafe_allow_html=True
+            )
