@@ -13,10 +13,23 @@ st.set_page_config(page_title="Up Tecnologia - Help Desk", layout="wide", page_i
 
 st.markdown("""
     <style>
-    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; box-shadow: 0px 2px 10px rgba(0,0,0,0.05); }
-    .stButton>button { border-radius: 8px; font-weight: bold; }
+    .main { background-color: #f5f7f9; }
+    .stButton>button { 
+        width: 100%; 
+        border-radius: 8px; 
+        height: 3em; 
+        background-color: #004a99; 
+        color: white; 
+        font-weight: bold;
+    }
+    [data-testid="stMetricValue"] {
+        background-color: white;
+        padding: 10px;
+        border-radius: 10px;
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
+    }
     </style>
-    """, unsafe_all_boxes=True)
+    """, unsafe_allow_html=True) # Alterado de unsafe_all_boxes para unsafe_allow_htm
 
 DB_NAME = 'up_tecnologia.db'
 
@@ -133,4 +146,5 @@ else:
 
     if st.sidebar.button("Sair"):
         st.session_state['logado'] = False
+
         st.rerun()
