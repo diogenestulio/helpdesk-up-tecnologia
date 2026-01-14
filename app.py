@@ -107,7 +107,7 @@ if tem_admin == 0 and not st.session_state["auth"]:
             conn.close()
             st.success("🎉 Administrador criado com sucesso! Você já está logado.")
             st.session_state["auth"] = {"user": usuario, "tipo": "admin", "cnpj": cnpj, "nome": nome}
-            st.experimental_rerun()
+            st.rerun()
     st.stop()
 
 # Fluxo normal de login
@@ -123,7 +123,7 @@ if not st.session_state["auth"]:
         conn.close()
         if res:
             st.session_state["auth"] = {"user": u, "tipo": res[0], "cnpj": res[1], "nome": res[2]}
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.error("Credenciais incorretas.")
     st.stop()
@@ -135,7 +135,7 @@ header()
 st.sidebar.success(f"Logado como: {st.session_state['auth']['nome']} ({st.session_state['auth']['tipo']})")
 if st.sidebar.button("🚪 Sair"):
     st.session_state["auth"] = None
-    st.experimental_rerun()
+    st.rerun()
 
 perfil = st.session_state["auth"]["tipo"]
 cnpj_user = st.session_state["auth"]["cnpj"]
@@ -187,9 +187,3 @@ elif menu == "Kanban de Chamados":
                         <strong>#{int(r['id'])}</strong> • {r['problema']}<br>
                         <small>
                             Etapa: {r['etapa']} • Autor: {r['autor']} • 
-                            Abertura: {r['data_abertura']} • Valor: R$ {r['valor']:.2f}
-                        </small>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-            )
