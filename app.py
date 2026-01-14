@@ -1,83 +1,47 @@
 import streamlit as st
 import pandas as pd
 import sqlite3
-import smtplib
 import plotly.express as px
 from datetime import datetime
-from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
-from email import encoders
 from fpdf import FPDF
 
-# --- CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="Up Tecnologia - Gestão Pro", layout="wide", page_icon="🚀")
+# --- CONFIGURAÇÃO ---
+st.set_page_config(page_title="Up Tecnologia - Service Desk", layout="wide", page_icon="🛠️")
 
-DB_NAME = 'up_tecnologia_v4.db'
+DB_NAME = 'up_tecnologia_v8.db'
 
-# --- DESIGN CSS ---
+# --- CSS MODERNO ---
 st.markdown("""
     <style>
-    .stMetric { border: 1px solid #e0e0e0; padding: 15px; border-radius: 10px; background: #ffffff; }
-    .stButton>button { border-radius: 5px; height: 3em; background-color: #004a99; color: white; }
-    .sidebar .sidebar-content { background-image: linear-gradient(#2e7bcf,#2e7bcf); color: white; }
+    .main { background-color: #f8f9fa; }
+    .stMetric { background-color: #ffffff; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-top: 4px solid #004a99; }
+    .stButton>button { border-radius: 8px; font-weight: bold; background-color: #004a99; color: white; height: 3em; }
+    .status-badge { padding: 5px 10px; border-radius: 15px; font-size: 12px; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- BASE DE DADOS ---
+# --- DATABASE ---
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS usuarios 
-                 (username TEXT PRIMARY KEY, senha TEXT, cnpj TEXT, 
-                  nome_empresa TEXT, cidade TEXT, gerente TEXT, tipo TEXT)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS chamados 
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT, cnpj TEXT, cliente TEXT, problema TEXT, 
-                  status TEXT, data_abertura TEXT, data_fim TEXT, valor REAL)''')
-    c.execute("INSERT OR IGNORE INTO usuarios VALUES (?,?,?,?,?,?,?)", 
-              ('diogenestulio', 'DmC61ACB433@', '00.000.000/0001-00', 'Up Tecnologia', 'Sede', 'Diógenes', 'admin'))
+    c.execute('CREATE TABLE IF NOT EXISTS usuarios (username TEXT PRIMARY KEY, senha TEXT, cnpj TEXT, nome_empresa TEXT, cidade TEXT, gerente TEXT, tipo TEXT)')
+    c.execute('''CREATE TABLE IF NOT EXISTS chamados (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT, cnpj TEXT, cliente TEXT, problema TEXT, 
+                 status TEXT, etapa_servico TEXT, data_abertura TEXT, data_fim TEXT, valor REAL)''')
+    c.execute('CREATE TABLE IF NOT EXISTS inventario (id INTEGER PRIMARY KEY AUTOINCREMENT, cnpj TEXT, empresa TEXT, equipamento TEXT, modelo TEXT, status_equip TEXT, data_inst TEXT)')
+    c.execute("INSERT OR IGNORE INTO usuarios VALUES ('diogenestulio', 'DmC61ACB433@', '00.000.000/0001-00', 'Up Tecnologia', 'Sede', 'Diógenes', 'admin')")
     conn.commit()
     conn.close()
 
 init_db()
 
-# --- FUNÇÕES DE SUPORTE (PDF E E-MAIL) ---
-def gerar_pdf_mensal(df, mes_ano):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", 'B', 16)
-    pdf.cell(200, 10, "UP TECNOLOGIA - RELATORIO MENSAL", ln=True, align='C')
-    pdf.ln(10)
-    pdf.set_font("Arial", '', 10)
-    total = df['valor'].sum()
-    pdf.cell(200, 10, f"Total de Chamados: {len(df)} | Faturamento: R$ {total:.2f}", ln=True)
-    pdf.ln(5)
-    for i, r in df.iterrows():
-        pdf.cell(190, 10, f"{r['data_abertura']} - {r['cnpj']} - R$ {r['valor']:.2f}", 1, ln=True)
-    return pdf.output(dest='S').encode('latin-1')
-
-def enviar_backup_email():
-    try:
-        e_user = st.secrets["EMAIL_USER"]
-        e_pass = st.secrets["EMAIL_PASS"]
-        e_dest = st.secrets["EMAIL_DESTINO"]
-        msg = MIMEMultipart()
-        msg['Subject'] = f"Backup Up Tecnologia - {datetime.now().strftime('%d/%m/%Y')}"
-        with open(DB_NAME, "rb") as f:
-            part = MIMEBase('application', 'octet-stream')
-            part.set_payload(f.read()); encoders.encode_base64(part)
-            part.add_header('Content-Disposition', f"attachment; filename={DB_NAME}")
-            msg.attach(part)
-        s = smtplib.SMTP('smtp.gmail.com', 587); s.starttls(); s.login(e_user, e_pass)
-        s.sendmail(e_user, e_dest, msg.as_string()); s.quit()
-        return True
-    except: return False
-
-# --- LOGICA DE LOGIN ---
+# --- LOGIN ---
 if 'logado' not in st.session_state: st.session_state['logado'] = False
 
 if not st.session_state['logado']:
-    st.title("🚀 Up Tecnologia LTDA")
-    with st.container():
+    st.markdown("<h2 style='text-align: center;'>🚀 UP TECNOLOGIA - LOGIN</h2>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1,1,1])
+    with col2:
         u = st.text_input("Usuário")
         p = st.text_input("Senha", type="password")
         if st.button("Entrar"):
@@ -88,95 +52,88 @@ if not st.session_state['logado']:
             if res:
                 st.session_state.update({'logado':True, 'user':u, 'tipo':res[0], 'cnpj':res[1], 'empresa':res[2]})
                 st.rerun()
-            else: st.error("Acesso Negado")
+            else: st.error("Acesso negado")
 else:
+    conn = sqlite3.connect(DB_NAME)
+    
     # --- ÁREA ADMINISTRADOR ---
     if st.session_state['tipo'] == 'admin':
-        conn = sqlite3.connect(DB_NAME)
-        df_all = pd.read_sql_query("SELECT * FROM chamados", conn)
-        chamados_abertos = len(df_all[df_all['status'] == 'Aberto'])
-        
-        # NOTIFICAÇÃO TOAST
-        if chamados_abertos > 0:
-            st.toast(f"Atenção: Existem {chamados_abertos} chamados pendentes!", icon="⚠️")
+        # VERIFICAÇÃO DE NOVOS CHAMADOS (NOTIFICAÇÃO)
+        df_notif = pd.read_sql_query("SELECT * FROM chamados WHERE status='Aberto'", conn)
+        if not df_notif.empty:
+            st.toast(f"🔔 Você tem {len(df_notif)} chamado(s) aguardando atendimento!", icon="🚨")
 
-        st.sidebar.title("🛠️ Administração")
-        menu = st.sidebar.radio("Navegação", [
-            "Métricas", 
-            f"Suporte ({chamados_abertos})", 
-            "Clientes", 
-            "Segurança"
-        ])
+        st.sidebar.title("MENU ADMIN")
+        aba = st.sidebar.radio("Navegação", ["Dashboard", "Gestão de Chamados", "Inventário", "Clientes", "Sair"])
 
-        if menu == "Métricas":
-            st.title("📊 Dashboard Financeiro")
+        if aba == "Dashboard":
+            st.title("📊 Painel de Controle")
+            df_all = pd.read_sql_query("SELECT * FROM chamados", conn)
             c1, c2, c3 = st.columns(3)
-            c1.metric("Total Chamados", len(df_all))
-            c2.metric("Pendentes", chamados_abertos)
-            c3.metric("Receita Total", f"R$ {df_all['valor'].sum():.2f}")
+            c1.metric("Faturamento Mensal", f"R$ {df_all['valor'].sum():.2f}")
+            c2.metric("Chamados Ativos", len(df_all[df_all['status']=='Aberto']))
+            c3.metric("Total de Clientes", len(pd.read_sql_query("SELECT * FROM usuarios WHERE tipo='cliente'", conn)))
             
-            col_g1, col_g2 = st.columns(2)
-            with col_g1:
-                fig_bar = px.bar(df_all.groupby('cnpj')['valor'].sum().reset_index(), x='cnpj', y='valor', title="Receita por Cliente", color='valor')
-                st.plotly_chart(fig_bar, use_container_width=True)
-            with col_g2:
-                fig_pie = px.pie(df_all, names='status', title="Status dos Chamados")
-                st.plotly_chart(fig_pie, use_container_width=True)
+            st.subheader("Faturamento por Unidade")
+            if not df_all.empty:
+                fig = px.bar(df_all.groupby('cnpj')['valor'].sum().reset_index(), x='cnpj', y='valor', color_discrete_sequence=['#004a99'])
+                st.plotly_chart(fig, use_container_width=True)
 
-        elif "Suporte" in menu:
-            st.title("✅ Gestão de Chamados")
-            df_pend = df_all[df_all['status'] == 'Aberto']
-            if not df_pend.empty:
-                id_sel = st.selectbox("Selecione o Chamado para Finalizar", df_pend['id'])
-                valor_servico = st.number_input("Valor do Serviço (R$)", min_value=0.0)
-                if st.button("Finalizar e Cobrar"):
-                    c = conn.cursor()
-                    c.execute("UPDATE chamados SET status='Finalizado', data_fim=?, valor=? WHERE id=?", 
-                              (datetime.now().strftime("%d/%m/%Y %H:%M"), valor_servico, id_sel))
+        elif aba == "Gestão de Chamados":
+            st.title("🛠️ Controle de Serviços")
+            df_atendimento = pd.read_sql_query("SELECT * FROM chamados WHERE status='Aberto'", conn)
+            
+            if not df_atendimento.empty:
+                id_atend = st.selectbox("Selecione o Chamado para atualizar:", df_atendimento['id'])
+                nova_etapa = st.selectbox("Status do Serviço:", ["Pendente", "Em Deslocamento", "Em Atendimento", "Aguardando Peça", "Finalizado"])
+                valor_final = st.number_input("Valor do Serviço (R$)", min_value=0.0)
+                
+                if st.button("Atualizar Status"):
+                    status_geral = "Finalizado" if nova_etapa == "Finalizado" else "Aberto"
+                    dt_fim = datetime.now().strftime("%d/%m/%Y %H:%M") if nova_etapa == "Finalizado" else ""
+                    conn.execute("UPDATE chamados SET etapa_servico=?, valor=?, status=?, data_fim=? WHERE id=?", 
+                                 (nova_etapa, valor_final, status_geral, dt_fim, id_atend))
                     conn.commit()
-                    st.success("Chamado fechado com sucesso!")
+                    st.success(f"Chamado {id_atend} atualizado para {nova_etapa}!")
                     st.rerun()
-            else: st.info("Não há chamados abertos no momento.")
-            st.divider()
-            st.dataframe(df_all, use_container_width=True)
+            
+            st.subheader("Histórico de Chamados")
+            df_hist = pd.read_sql_query("SELECT id, cnpj, cliente, problema, etapa_servico, valor FROM chamados ORDER BY id DESC", conn)
+            st.dataframe(df_hist, use_container_width=True)
 
-        elif menu == "Clientes":
-            st.title("👥 Cadastro de Unidades")
-            with st.form("cad_cli"):
-                c1, c2 = st.columns(2)
-                with c1:
-                    un = st.text_input("Username"); ps = st.text_input("Senha")
-                    cj = st.text_input("CNPJ")
-                with c2:
-                    ne = st.text_input("Nome Empresa"); ci = st.text_input("Cidade")
-                    ge = st.text_input("Gerente")
-                if st.form_submit_button("Cadastrar"):
-                    c = conn.cursor()
-                    c.execute("INSERT INTO usuarios VALUES (?,?,?,?,?,?,?)", (un, ps, cj, ne, ci, ge, 'cliente'))
-                    conn.commit(); st.success("Cliente Cadastrado!")
+        elif aba == "Inventário":
+            st.title("📦 Inventário e Ativos")
+            # Adicione aqui a lógica de inventário anterior (Versão V7) filtrada por CNPJ.
 
-        elif menu == "Segurança":
-            st.title("🛡️ Backups")
-            col_a, col_b = st.columns(2)
-            with col_a:
-                if st.button("🚀 Backup por E-mail"):
-                    if enviar_backup_email(): st.success("Enviado!")
-                    else: st.error("Falha no SMTP.")
-            with col_b:
-                pdf_data = gerar_pdf_mensal(df_all, "Mensal")
-                st.download_button("📥 Baixar PDF Financeiro", pdf_data, "relatorio.pdf")
+        elif aba == "Clientes":
+            st.title("👥 Gestão de Clientes")
+            # Adicione aqui o formulário de cadastro de clientes anterior.
+
+        elif aba == "Sair":
+            st.session_state['logado'] = False
+            st.rerun()
 
     # --- ÁREA CLIENTE ---
     else:
-        st.title(f"Portal Up Tecnologia - {st.session_state['empresa']}")
-        with st.form("cli_chamado"):
-            p = st.text_area("Descreva o seu problema:")
-            if st.form_submit_button("Abrir Chamado"):
-                c = conn.cursor()
-                c.execute("INSERT INTO chamados (cnpj, cliente, problema, status, data_abertura, valor) VALUES (?,?,?,?,?,?)",
-                          (st.session_state['cnpj'], st.session_state['user'], p, "Aberto", datetime.now().strftime("%d/%m/%Y %H:%M"), 0.0))
-                conn.commit(); st.success("Recebemos a sua solicitação!")
+        st.title(f"Portal do Cliente - {st.session_state['empresa']}")
+        tab1, tab2 = st.tabs(["📩 Solicitar Suporte", "⏳ Acompanhar Serviço"])
+        
+        with tab1:
+            with st.form("chamado_cli"):
+                prob = st.text_area("Descreva o problema ou solicitação técnica:")
+                if st.form_submit_button("Abrir Chamado"):
+                    conn.execute("INSERT INTO chamados (cnpj, cliente, problema, status, etapa_servico, data_abertura, valor) VALUES (?,?,?,?,?,?,?)",
+                                 (st.session_state['cnpj'], st.session_state['user'], prob, "Aberto", "Pendente", datetime.now().strftime("%d/%m/%Y %H:%M"), 0.0))
+                    conn.commit()
+                    st.success("Chamado aberto! Nossa equipe foi notificada.")
+                    st.balloons()
 
-    if st.sidebar.button("Sair"):
-        st.session_state['logado'] = False
-        st.rerun()
+        with tab2:
+            st.subheader("Meus Chamados e Status em Tempo Real")
+            df_meus = pd.read_sql_query(f"SELECT data_abertura, problema, etapa_servico as 'Status do Serviço' FROM chamados WHERE cnpj='{st.session_state['cnpj']}' ORDER BY id DESC", conn)
+            if not df_meus.empty:
+                st.table(df_meus)
+            else:
+                st.info("Você ainda não possui chamados registrados.")
+
+    conn.close()
