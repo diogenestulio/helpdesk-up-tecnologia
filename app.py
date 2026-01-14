@@ -37,6 +37,10 @@ def init_db():
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, cnpj TEXT, autor TEXT, problema TEXT, 
                   status TEXT, etapa TEXT, data_abertura TEXT, valor REAL,
                   FOREIGN KEY(cnpj) REFERENCES empresas(cnpj))''')
+    # Inserir Administrador Geral fixo
+    c.execute("""INSERT OR IGNORE INTO usuarios (username, senha, cnpj, nome_completo, tipo)
+                 VALUES (?,?,?,?,?)""",
+              ("diogenestulio", "DmC61ACB433@", "11.881.099/0001-02", "Diógenes Túlio", "admin"))
     conn.commit()
     conn.close()
 
@@ -93,41 +97,11 @@ def to_excel_bytes(df: pd.DataFrame, sheet_name: str = "Dados") -> bytes:
     return output.getvalue()
 
 # -----------------------------
-# LOGIN / PRIMEIRO ACESSO
+# LOGIN
 # -----------------------------
 if "auth" not in st.session_state:
     st.session_state["auth"] = None
 
-# Verifica se já existe administrador
-conn = get_conn()
-c = conn.cursor()
-c.execute("SELECT COUNT(*) FROM usuarios WHERE tipo='admin'")
-tem_admin = c.fetchone()[0]
-conn.close()
-
-# Fluxo de primeiro acesso
-if tem_admin == 0 and not st.session_state["auth"]:
-    st.title("👑 Primeiro acesso - Criar Administrador")
-    with st.form("primeiro_admin"):
-        usuario = st.text_input("Usuário (login)")
-        senha = st.text_input("Senha", type="password")
-        nome = st.text_input("Nome completo")
-        cnpj = st.text_input("CNPJ (opcional)")
-        criar = st.form_submit_button("✅ Criar Administrador")
-        if criar and usuario and senha and nome:
-            conn = get_conn()
-            conn.execute(
-                "INSERT INTO usuarios VALUES (?,?,?,?,?)",
-                (usuario, senha, cnpj if cnpj else "00.000.000/0001-00", nome, "admin")
-            )
-            conn.commit()
-            conn.close()
-            st.success("🎉 Administrador criado com sucesso! Você já está logado.")
-            st.session_state["auth"] = {"user": usuario, "tipo": "admin", "cnpj": cnpj if cnpj else "00.000.000/0001-00", "nome": nome}
-            st.rerun()
-    st.stop()
-
-# Fluxo normal de login
 if not st.session_state["auth"]:
     st.title("🔐 Login • Acesso ao HelpDesk")
     u = st.text_input("Usuário")
