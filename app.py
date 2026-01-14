@@ -180,9 +180,15 @@ elif menu == "Kanban de Chamados":
             if subset.empty:
                 st.caption("Sem chamados aqui.")
             for _, r in subset.iterrows():
-                st.markdown(f"""
-                <div style="margin-bottom:12px; padding:12px; backdrop-filter: blur(6px); background:{GLASS}; border-radius:12px; border:1px solid #eaeaea;">
-                    <strong>#{int(r['id'])}</strong> • {r['problema']}<br>
-                    <small>Etapa: {r['etapa']} • Autor: {r['autor']} • Abertura: {r['data_abertura']} • Valor: R$ {r['valor']:.2f}</small>
-                </div>
-                ""
+                st.markdown(
+                    f"""
+                    <div style="margin-bottom:12px; padding:12px; backdrop-filter: blur(6px); 
+                                background:{GLASS}; border-radius:12px; border:1px solid #eaeaea;">
+                        <strong>#{int(r['id'])}</strong> • {r['problema']}<br>
+                        <small>
+                            Etapa: {r['etapa']} • Autor: {r['autor']} • 
+                            Abertura: {r['data_abertura']} • Valor: R$ {r['valor']:.2f}
+                        </small>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
